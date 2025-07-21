@@ -1,4 +1,4 @@
-import { Alert, AlertType, AlertSeverity } from './types';
+import { Alert, AlertType, AlertSeverity, AlertStatus } from './types';
 import { generateId } from './mockData';
 import TagService from './TagService';
 
@@ -21,7 +21,8 @@ class AlertService {
       severity,
       timestamp: new Date().toISOString(),
       resolved: false,
-      message
+      message,
+      status: AlertStatus.NEW
     };
     
     const alerts = this.getAllAlerts();
@@ -29,6 +30,37 @@ class AlertService {
     
     this.saveAlerts(alerts);
     return alert;
+  }
+  
+  /**
+   * Acknowledge an alert
+   */
+  acknowledgeAlert(alertId: string): Alert | undefined {
+    const alerts = this.getAllAlerts();
+    const alertIndex = alerts.findIndex(a => a.id === alertId);
+    
+    if (alertIndex === -1) return undefined;
+    
+    alerts[alertIndex].status = AlertStatus.ACKNOWLEDGED;
+    this.saveAlerts(alerts);
+    
+    return alerts[alertIndex];
+  }
+  
+  /**
+   * Add a comment to an alert
+   */
+  commentAlert(alertId: string, comment: string): Alert | undefined {
+    const alerts = this.getAllAlerts();
+    const alertIndex = alerts.findIndex(a => a.id === alertId);
+    
+    if (alertIndex === -1) return undefined;
+    
+    alerts[alertIndex].comment = comment;
+    alerts[alertIndex].status = AlertStatus.COMMENTED;
+    this.saveAlerts(alerts);
+    
+    return alerts[alertIndex];
   }
   
   /**
@@ -41,6 +73,7 @@ class AlertService {
     if (alertIndex === -1) return undefined;
     
     alerts[alertIndex].resolved = true;
+    alerts[alertIndex].status = AlertStatus.RESOLVED;
     this.saveAlerts(alerts);
     
     return alerts[alertIndex];
@@ -92,15 +125,27 @@ class AlertService {
   }
   
   /**
-   * Check if an unassigned tag is being moved and trigger alert if needed
+   * Get alerts by status
    */
-  checkUnassignedTagMovement(tagId: string): boolean {
-    if (!TagService.isTagAssigned(tagId)) {
+  getAlertsByStatus(status: AlertStatus): Alert[] {
+    const alerts = this.getAllAlerts();
+    return alerts.filter(alert => alert.status === status);
+  }
+  
+  /**
+   * Check for unauthorized movement
+   */
+  checkUnauthorizedMovement(tagId: string): boolean {
+    // Implementation would depend on business rules
+    // This is a placeholder
+    const shouldTriggerAlert = Math.random() > 0.7;
+    
+    if (shouldTriggerAlert) {
       this.triggerAlert(
         tagId,
-        AlertType.UNASSIGNED_TAG,
+        AlertType.UNAUTHORIZED_MOVEMENT,
         AlertSeverity.HIGH,
-        'Unassigned tag detected in movement'
+        'Unauthorized movement detected'
       );
       return true;
     }
@@ -116,6 +161,25 @@ class AlertService {
     } catch (error) {
       console.error('Error saving alerts', error);
     }
+  }
+  
+  /**
+   * Dismiss all alerts (legacy method - kept for backwards compatibility)
+   */
+  dismissAllAlerts(): void {
+    const alerts = this.getAllAlerts();
+    alerts.forEach(alert => {
+      alert.resolved = true;
+      alert.status = AlertStatus.RESOLVED;
+    });
+    this.saveAlerts(alerts);
+  }
+  
+  /**
+   * Dismiss an alert (legacy method - kept for backwards compatibility)
+   */
+  dismissAlert(alertId: string): Alert | undefined {
+    return this.resolveAlert(alertId);
   }
 }
 

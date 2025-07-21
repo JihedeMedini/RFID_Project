@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
-import { AlertService, AlertType, AlertSeverity, TagService, MOCK_ITEMS } from '../mockServices';
+import { AlertService, AlertType, AlertSeverity, AlertStatus, TagService, MOCK_ITEMS } from '../mockServices';
 import type { Alert } from '../mockServices';
 
 const AlertsDashboard = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | ''>('');
   const [typeFilter, setTypeFilter] = useState<AlertType | ''>('');
+  const [statusFilter, setStatusFilter] = useState<AlertStatus | ''>('');
   const [isLoading, setIsLoading] = useState(true);
-  const [showDismissAnimation, setShowDismissAnimation] = useState<string | null>(null);
+  const [showActionAnimation, setShowActionAnimation] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [commentAlertId, setCommentAlertId] = useState<string | null>(null);
 
   useEffect(() => {
     // Simulate loading alerts
@@ -25,20 +28,52 @@ const AlertsDashboard = () => {
   const handleTypeFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setTypeFilter(e.target.value as AlertType | '');
   };
+  
+  const handleStatusFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setStatusFilter(e.target.value as AlertStatus | '');
+  };
 
-  const handleDismissAlert = (alertId: string) => {
-    setShowDismissAnimation(alertId);
+  const handleAcknowledgeAlert = (alertId: string) => {
+    setShowActionAnimation(alertId);
     
     setTimeout(() => {
-      AlertService.dismissAlert(alertId);
+      AlertService.acknowledgeAlert(alertId);
       setAlerts(AlertService.getAllAlerts());
-      setShowDismissAnimation(null);
+      setShowActionAnimation(null);
+    }, 500);
+  };
+  
+  const openCommentDialog = (alertId: string) => {
+    setCommentAlertId(alertId);
+  };
+  
+  const handleCommentSubmit = () => {
+    if (!commentAlertId || !commentText.trim()) return;
+    
+    setShowActionAnimation(commentAlertId);
+    
+    setTimeout(() => {
+      AlertService.commentAlert(commentAlertId, commentText);
+      setAlerts(AlertService.getAllAlerts());
+      setShowActionAnimation(null);
+      setCommentAlertId(null);
+      setCommentText('');
+    }, 500);
+  };
+  
+  const handleResolveAlert = (alertId: string) => {
+    setShowActionAnimation(alertId);
+    
+    setTimeout(() => {
+      AlertService.resolveAlert(alertId);
+      setAlerts(AlertService.getAllAlerts());
+      setShowActionAnimation(null);
     }, 500);
   };
 
-  const handleDismissAll = () => {
-    AlertService.dismissAllAlerts();
-    setAlerts([]);
+  const handleResolveAll = () => {
+    AlertService.dismissAllAlerts(); // Using legacy method for compatibility
+    setAlerts(AlertService.getAllAlerts());
   };
 
   const handleSimulateAlert = () => {
@@ -69,6 +104,7 @@ const AlertsDashboard = () => {
   const filteredAlerts = alerts.filter(alert => {
     if (severityFilter && alert.severity !== severityFilter) return false;
     if (typeFilter && alert.type !== typeFilter) return false;
+    if (statusFilter && alert.status !== statusFilter) return false;
     return true;
   });
 
@@ -85,10 +121,20 @@ const AlertsDashboard = () => {
   // Get color for alert type badge
   const getAlertTypeColor = (type: AlertType): string => {
     switch (type) {
-      case AlertType.UNAUTHORIZED_ACCESS: return 'bg-red-100 text-red-800';
-      case AlertType.UNASSIGNED_TAG: return 'bg-yellow-100 text-yellow-800';
-      case AlertType.ZONE_VIOLATION: return 'bg-orange-100 text-orange-800';
-      case AlertType.MOVEMENT_ANOMALY: return 'bg-purple-100 text-purple-800';
+      case AlertType.UNAUTHORIZED_MOVEMENT: return 'bg-red-100 text-red-800';
+      case AlertType.WRONG_ZONE: return 'bg-orange-100 text-orange-800';
+      case AlertType.QUANTITY_MISMATCH: return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+  
+  // Get color for alert status badge
+  const getStatusColor = (status?: AlertStatus): string => {
+    switch (status) {
+      case AlertStatus.NEW: return 'bg-blue-100 text-blue-800';
+      case AlertStatus.ACKNOWLEDGED: return 'bg-yellow-100 text-yellow-800';
+      case AlertStatus.COMMENTED: return 'bg-purple-100 text-purple-800';
+      case AlertStatus.RESOLVED: return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -108,14 +154,14 @@ const AlertsDashboard = () => {
             Simulate Alert
           </button>
           <button
-            onClick={handleDismissAll}
+            onClick={handleResolveAll}
             className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md transition-all duration-200 flex items-center hover:shadow-md active:scale-95"
             disabled={filteredAlerts.length === 0}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
-            Dismiss All
+            Resolve All
           </button>
         </div>
       </div>
@@ -169,6 +215,25 @@ const AlertsDashboard = () => {
                 ))}
               </select>
             </div>
+            
+            <div className="flex-1 transition-all duration-300 ease-in-out transform hover:scale-[1.01]">
+              <label htmlFor="statusFilter" className="block text-xs font-medium text-gray-500 mb-1">
+                Filter by Status
+              </label>
+              <select
+                id="statusFilter"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                value={statusFilter}
+                onChange={handleStatusFilterChange}
+              >
+                <option value="">All Statuses</option>
+                {Object.values(AlertStatus).map(status => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
         
@@ -199,6 +264,7 @@ const AlertsDashboard = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Message</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
@@ -209,7 +275,7 @@ const AlertsDashboard = () => {
                     return (
                       <tr 
                         key={alert.id} 
-                        className={`${showDismissAnimation === alert.id ? 'animate-slide-out opacity-0' : 'hover:bg-gray-50'} transition-all duration-300`}
+                        className={`${showActionAnimation === alert.id ? 'animate-pulse opacity-70' : 'hover:bg-gray-50'} transition-all duration-300`}
                         style={{ animationDelay: `${index * 0.05}s` }}
                       >
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -231,19 +297,57 @@ const AlertsDashboard = () => {
                             {alert.severity}
                           </span>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(alert.status)}`}>
+                            {alert.status || 'NEW'}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {alert.message}
+                          <div>
+                            {alert.message}
+                            {alert.comment && (
+                              <div className="mt-1 text-xs italic text-gray-500">
+                                Comment: {alert.comment}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleDismissAlert(alert.id)}
-                            className="text-red-600 hover:text-red-900 transition-colors duration-200 hover:scale-110 transform inline-flex items-center"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                            </svg>
-                            Dismiss
-                          </button>
+                          <div className="flex space-x-2 justify-end">
+                            {alert.status !== AlertStatus.ACKNOWLEDGED && alert.status !== AlertStatus.COMMENTED && alert.status !== AlertStatus.RESOLVED && (
+                              <button
+                                onClick={() => handleAcknowledgeAlert(alert.id)}
+                                className="text-blue-600 hover:text-blue-900 transition-colors duration-200"
+                                title="Acknowledge"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            )}
+                            {alert.status !== AlertStatus.COMMENTED && (
+                              <button
+                                onClick={() => openCommentDialog(alert.id)}
+                                className="text-purple-600 hover:text-purple-900 transition-colors duration-200"
+                                title="Comment"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            )}
+                            {alert.status !== AlertStatus.RESOLVED && (
+                              <button
+                                onClick={() => handleResolveAlert(alert.id)}
+                                className="text-green-600 hover:text-green-900 transition-colors duration-200"
+                                title="Resolve"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -313,6 +417,40 @@ const AlertsDashboard = () => {
           </div>
         </div>
       </div>
+      
+      {/* Comment Dialog */}
+      {commentAlertId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Add Comment</h3>
+            <textarea
+              className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              rows={4}
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Enter your comment here..."
+            ></textarea>
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setCommentAlertId(null);
+                  setCommentText('');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCommentSubmit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                disabled={!commentText.trim()}
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
