@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,12 +12,37 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../App';
+import { UserService, User, UserStatus } from '../services';
 
 type HomeScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
 };
 
 const HomeScreen = ({ navigation }: HomeScreenProps) => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    // Load current user
+    const loadUser = async () => {
+      const user = await UserService.getCurrentUser();
+      setCurrentUser(user);
+    };
+    
+    loadUser();
+  }, []);
+
+  // Function to get connection status icon
+  const getStatusIndicator = () => {
+    if (!isOnline) {
+      return { color: '#ef4444', text: 'Offline' }; // Red for offline
+    }
+    
+    return { color: '#10b981', text: 'Online' }; // Green for online
+  };
+
+  const statusIndicator = getStatusIndicator();
+
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#1e40af" />
@@ -37,6 +62,25 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
             </View>
           </View>
         </ImageBackground>
+
+        {currentUser && (
+          <View style={styles.userInfoContainer}>
+            <View style={styles.userInfoLeft}>
+              <Image
+                source={{ uri: currentUser.profileImage || 'https://randomuser.me/api/portraits/lego/1.jpg' }}
+                style={styles.userAvatar}
+              />
+              <View style={styles.userTextContainer}>
+                <Text style={styles.userName}>{currentUser.fullName}</Text>
+                <Text style={styles.userRole}>{currentUser.role}</Text>
+              </View>
+            </View>
+            <View style={styles.connectionStatus}>
+              <View style={[styles.statusDot, { backgroundColor: statusIndicator.color }]} />
+              <Text style={styles.statusText}>{statusIndicator.text}</Text>
+            </View>
+          </View>
+        )}
 
         <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
           <View style={styles.statsContainer}>
@@ -92,6 +136,69 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
                 <Text style={styles.menuItemText}>Assign Tag</Text>
                 <Text style={styles.menuItemDescription}>
                   Link RFID tags to inventory items
+                </Text>
+              </View>
+              <View style={styles.menuArrow}>
+                <Text style={styles.menuArrowText}>›</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('ItemLookup')}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: '#6366f1' }]}>
+                <Image
+                  source={{ uri: 'https://img.icons8.com/ios-filled/100/ffffff/search--v1.png' }}
+                  style={styles.menuIcon}
+                />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuItemText}>Item Lookup</Text>
+                <Text style={styles.menuItemDescription}>
+                  Search for items by Oracle ID or SKU
+                </Text>
+              </View>
+              <View style={styles.menuArrow}>
+                <Text style={styles.menuArrowText}>›</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('IssuanceVerification')}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: '#10b981' }]}>
+                <Image
+                  source={{ uri: 'https://img.icons8.com/ios-filled/100/ffffff/verified-account--v1.png' }}
+                  style={styles.menuIcon}
+                />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuItemText}>Issuance Verification</Text>
+                <Text style={styles.menuItemDescription}>
+                  Verify items against Oracle orders
+                </Text>
+              </View>
+              <View style={styles.menuArrow}>
+                <Text style={styles.menuArrowText}>›</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('Alerts')}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: '#ef4444' }]}>
+                <Image
+                  source={{ uri: 'https://img.icons8.com/ios-filled/100/ffffff/bell--v1.png' }}
+                  style={styles.menuIcon}
+                />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuItemText}>Alerts</Text>
+                <Text style={styles.menuItemDescription}>
+                  View and manage system alerts
                 </Text>
               </View>
               <View style={styles.menuArrow}>
@@ -222,6 +329,57 @@ const styles = StyleSheet.create({
   taglineText: {
     color: 'white',
     fontSize: 12,
+  },
+  userInfoContainer: {
+    backgroundColor: 'white',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  userInfoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  userTextContainer: {
+    justifyContent: 'center',
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  userRole: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#4b5563',
   },
   content: {
     flex: 1,

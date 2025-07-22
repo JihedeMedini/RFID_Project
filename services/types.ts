@@ -5,6 +5,11 @@ export interface Item {
   name: string;
   sku: string;
   description?: string;
+  oracleId?: string;
+  quantity?: number;
+  homeZone?: Zone;
+  category?: string;
+  lastMovement?: string;
 }
 
 export interface TagAssignment {
@@ -35,6 +40,26 @@ export interface Alert {
   resolvedAt?: string;
   tagId?: string;
   zoneId?: string;
+  
+  // Acknowledgement properties
+  acknowledged?: boolean;
+  acknowledgement?: {
+    alertId: string;
+    acknowledgedBy: string;
+    acknowledgedAt: string;
+    notes?: string;
+  };
+  
+  // Escalation properties
+  escalated?: boolean;
+  escalatedBy?: string;
+  escalatedAt?: string;
+  escalationNotes?: string;
+  
+  // Additional metadata
+  relatedAlerts?: string[]; // IDs of related alerts
+  actionTaken?: string;
+  priority?: number; // Numeric priority value
 }
 
 export enum Zone {

@@ -11,27 +11,55 @@ import {
   SafeAreaView,
   StatusBar,
   Image,
-  FlatList
+  FlatList,
+  Modal
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../App';
-import { TagService, MOCK_ITEMS, Item, TagAssignment } from '../services';
+import { 
+  TagService, 
+  MOCK_ITEMS, 
+  Item, 
+  TagAssignment, 
+  Zone, 
+  findItemByOracleId,
+  findItemBySku
+} from '../services';
 
 type AssignTagScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'AssignTag'>;
+  route: RouteProp<RootStackParamList, 'AssignTag'>;
 };
 
-const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
+const AssignTagScreen = ({ navigation, route }: AssignTagScreenProps) => {
   const [tagId, setTagId] = useState('');
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [success, setSuccess] = useState(false);
   const [assignments, setAssignments] = useState<TagAssignment[]>([]);
   const [scanAnimation, setScanAnimation] = useState(false);
+  const [isTagValid, setIsTagValid] = useState(true);
+  const [tagError, setTagError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredItems, setFilteredItems] = useState(MOCK_ITEMS);
+  const [selectedHomeZone, setSelectedHomeZone] = useState<Zone | null>(null);
+  const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
+  const [searchType, setSearchType] = useState<'oracle' | 'sku'>('oracle');
 
   useEffect(() => {
     loadAssignments();
-  }, []);
+    
+    // If itemId is provided via route params, preselect that item
+    if (route.params?.itemId) {
+      const item = MOCK_ITEMS.find(item => item.id === route.params?.itemId);
+      if (item) {
+        setSelectedItem(item);
+        setSelectedHomeZone(item.homeZone || null);
+      }
+    }
+  }, [route.params]);
 
   const loadAssignments = async () => {
     try {
@@ -50,6 +78,50 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
     // Generate a random tag ID to simulate scanning
     const randomTag = `TAG${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
     setTagId(randomTag);
+    validateTag(randomTag);
+  };
+  
+  const validateTag = async (tag: string) => {
+    if (!tag.trim()) {
+      setIsTagValid(false);
+      setTagError('Tag ID cannot be empty');
+      return false;
+    }
+    
+    setValidating(true);
+    
+    try {
+      // Check if tag is already assigned
+      const isAssigned = await TagService.isTagAssigned(tag);
+      
+      if (isAssigned) {
+        setIsTagValid(false);
+        setTagError('This tag is already assigned to another item');
+        setValidating(false);
+        return false;
+      } else {
+        setIsTagValid(true);
+        setTagError('');
+        setValidating(false);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error validating tag', error);
+      setIsTagValid(false);
+      setTagError('Error validating tag');
+      setValidating(false);
+      return false;
+    }
+  };
+
+  const handleTagChange = (text: string) => {
+    setTagId(text);
+    if (text.trim()) {
+      validateTag(text);
+    } else {
+      setIsTagValid(true);
+      setTagError('');
+    }
   };
 
   const handleAssign = async () => {
@@ -63,28 +135,80 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
       return;
     }
 
+    if (!isTagValid || validating) {
+      Alert.alert('Error', tagError || 'Please wait for tag validation to complete.');
+      return;
+    }
+
     setLoading(true);
     
     try {
-      // Check if tag is already assigned
-      const isAssigned = await TagService.isTagAssigned(tagId);
+      // Final validation before assigning
+      const isValidTag = await validateTag(tagId);
       
-      if (isAssigned) {
-        Alert.alert('Error', 'This tag is already assigned to an item.');
+      if (!isValidTag) {
+        Alert.alert('Error', tagError || 'This tag cannot be assigned.');
         setLoading(false);
         return;
       }
 
+      // Update item's home zone if selected
+      const updatedItem = {
+        ...selectedItem,
+        homeZone: selectedHomeZone || selectedItem.homeZone
+      };
+
       // Assign tag to item
-      await TagService.assignTag(tagId, selectedItem.id);
+      await TagService.assignTag(tagId, updatedItem.id);
       
       // Show success message
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 2000);
+      
+      // Store the assigned tag ID to allow printing
+      const assignedTagId = tagId;
+      const assignedItemId = updatedItem.id;
+      
+      setTimeout(() => {
+        setSuccess(false);
+        
+        // Ask if the user wants to print the tag
+        Alert.alert(
+          'Tag Assigned Successfully',
+          'Do you want to print this tag?',
+          [
+            {
+              text: 'No, Skip',
+              style: 'cancel',
+              onPress: () => {
+                // Clear form
+                setTagId('');
+                setSelectedItem(null);
+                setSelectedHomeZone(null);
+                
+                // Navigate back to lookup screen if we came from there
+                if (route.params?.itemId) {
+                  navigation.goBack();
+                }
+              }
+            },
+            {
+              text: 'Yes, Print',
+              onPress: () => {
+                // Navigate to print screen
+                navigation.navigate('PrintTag', {
+                  tagId: assignedTagId,
+                  itemId: assignedItemId
+                });
       
       // Clear form
       setTagId('');
       setSelectedItem(null);
+                setSelectedHomeZone(null);
+              }
+            }
+          ]
+        );
+      }, 2000);
       
       // Refresh assignments
       loadAssignments();
@@ -96,13 +220,74 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
     }
   };
 
+  const handleSearch = () => {
+    if (!searchQuery.trim()) {
+      setFilteredItems(MOCK_ITEMS);
+      return;
+    }
+    
+    const query = searchQuery.toLowerCase();
+    const filtered = MOCK_ITEMS.filter(item => 
+      item.name.toLowerCase().includes(query) || 
+      item.sku.toLowerCase().includes(query)
+    );
+    
+    setFilteredItems(filtered);
+  };
+
+  const handleOracleSearch = () => {
+    if (!searchQuery.trim()) {
+      Alert.alert('Error', 'Please enter a search term');
+      return;
+    }
+
+    let item: Item | undefined;
+    
+    // Search based on selected type
+    if (searchType === 'oracle') {
+      item = findItemByOracleId(searchQuery);
+    } else {
+      item = findItemBySku(searchQuery);
+    }
+    
+    if (item) {
+      setSelectedItem(item);
+      setSelectedHomeZone(item.homeZone || null);
+      setIsSearchModalVisible(false);
+    } else {
+      Alert.alert(
+        'Not Found', 
+        `No item found for ${searchType === 'oracle' ? 'Oracle ID' : 'SKU'}: ${searchQuery}`
+      );
+    }
+  };
+
+  const handleBarcodeSimulation = () => {
+    // Simulate scanning a barcode for an item (Oracle ID or SKU)
+    const mockOracleIds = ['ORC-10045782', 'ORC-10038921', 'ORC-10029873'];
+    const mockSKUs = ['IPH15-128', 'MBP14-1TB', 'APP-2'];
+    
+    const mockValues = searchType === 'oracle' ? mockOracleIds : mockSKUs;
+    const randomValue = mockValues[Math.floor(Math.random() * mockValues.length)];
+    
+    setSearchQuery(randomValue);
+    
+    // Auto-search after "scan"
+    setTimeout(() => {
+      handleOracleSearch();
+    }, 500);
+  };
+
   const renderItem = ({ item }: { item: Item }) => (
     <TouchableOpacity
       style={[
         styles.itemOption,
         selectedItem?.id === item.id && styles.itemOptionSelected
       ]}
-      onPress={() => setSelectedItem(item)}
+      onPress={() => {
+        setSelectedItem(item);
+        setSelectedHomeZone(item.homeZone || null);
+      }}
     >
       <View style={styles.itemIconContainer}>
         <Image 
@@ -122,6 +307,7 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
         >
           {item.name}
         </Text>
+        <View style={styles.itemDetailsRow}>
         <Text 
           style={[
             styles.itemSku,
@@ -130,6 +316,15 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
         >
           {item.sku}
         </Text>
+          <Text 
+            style={[
+              styles.itemOracleId,
+              selectedItem?.id === item.id && styles.itemOracleIdSelected
+            ]}
+          >
+            {item.oracleId}
+          </Text>
+        </View>
         {item.description && (
           <Text 
             style={[
@@ -142,7 +337,10 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
           </Text>
         )}
       </View>
-      <View style={styles.itemCheckbox}>
+      <View style={[
+        styles.itemCheckbox,
+        selectedItem?.id === item.id && styles.itemCheckboxSelected
+      ]}>
         {selectedItem?.id === item.id && (
           <View style={styles.itemCheckboxInner}>
             <Image 
@@ -177,9 +375,12 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
             <Text style={styles.inputLabel}>Tag ID</Text>
             <View style={styles.scanInputContainer}>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  !isTagValid && styles.inputError
+                ]}
                 value={tagId}
-                onChangeText={setTagId}
+                onChangeText={handleTagChange}
                 placeholder="Enter tag ID or scan"
                 placeholderTextColor="#9ca3af"
               />
@@ -193,6 +394,22 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
                 />
               </TouchableOpacity>
             </View>
+            {!isTagValid && tagError ? (
+              <Text style={styles.errorText}>{tagError}</Text>
+            ) : validating ? (
+              <View style={styles.validatingContainer}>
+                <ActivityIndicator size="small" color="#3b82f6" />
+                <Text style={styles.validatingText}>Validating tag...</Text>
+              </View>
+            ) : isTagValid && tagId ? (
+              <View style={styles.validContainer}>
+                <Image 
+                  source={{ uri: 'https://img.icons8.com/ios-filled/100/10b981/checkmark--v1.png' }}
+                  style={styles.validIcon}
+                />
+                <Text style={styles.validText}>Valid tag</Text>
+              </View>
+            ) : null}
           </View>
         </View>
         
@@ -206,25 +423,90 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
           </View>
           
           <View style={styles.cardBody}>
+            <View style={styles.itemSearchContainer}>
+              <TextInput
+                style={styles.itemSearchInput}
+                value={searchQuery}
+                onChangeText={text => {
+                  setSearchQuery(text);
+                  handleSearch();
+                }}
+                placeholder="Search items by name or SKU..."
+                placeholderTextColor="#9ca3af"
+              />
+              <TouchableOpacity
+                style={styles.searchOracleButton}
+                onPress={() => setIsSearchModalVisible(true)}
+              >
+                <Image 
+                  source={{ uri: 'https://img.icons8.com/ios-filled/100/ffffff/search--v1.png' }}
+                  style={styles.searchIcon}
+                />
+                <Text style={styles.searchOracleText}>Oracle</Text>
+              </TouchableOpacity>
+            </View>
+
+            {selectedItem && (
+              <View style={styles.selectedItemBanner}>
+                <Text style={styles.selectedItemText}>Selected: {selectedItem.name}</Text>
+              </View>
+            )}
+            
             <Text style={styles.inputLabel}>Available Items</Text>
             <View style={styles.itemsContainer}>
               <FlatList
-                data={MOCK_ITEMS}
+                data={filteredItems}
                 renderItem={renderItem}
                 keyExtractor={item => item.id}
                 extraData={selectedItem}
                 scrollEnabled={false}
               />
             </View>
+          </View>
+        </View>
+
+        {selectedItem && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Image 
+                source={{ uri: 'https://img.icons8.com/ios-filled/100/ffffff/map-marker--v1.png' }}
+                style={styles.cardIcon}
+              />
+              <Text style={styles.cardTitle}>Home Zone</Text>
+            </View>
+            
+            <View style={styles.cardBody}>
+              <Text style={styles.inputLabel}>Select Home Zone for Item</Text>
+              <View style={styles.zonesContainer}>
+                {Object.values(Zone).map((zone) => (
+                  <TouchableOpacity
+                    key={zone}
+                    style={[
+                      styles.zoneButton,
+                      selectedHomeZone === zone && styles.zoneButtonSelected
+                    ]}
+                    onPress={() => setSelectedHomeZone(zone)}
+                  >
+                    <Text
+                      style={[
+                        styles.zoneButtonText,
+                        selectedHomeZone === zone && styles.zoneButtonTextSelected
+                      ]}
+                    >
+                      {zone.replace(/_/g, ' ')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
             
             <TouchableOpacity
               style={[
                 styles.submitButton,
                 success && styles.submitButtonSuccess,
-                (!tagId.trim() || !selectedItem) && styles.submitButtonDisabled
+                  (!tagId.trim() || !selectedItem || !isTagValid || validating) && styles.submitButtonDisabled
               ]}
               onPress={handleAssign}
-              disabled={loading || success || !tagId.trim() || !selectedItem}
+                disabled={loading || success || !tagId.trim() || !selectedItem || !isTagValid || validating}
             >
               {loading ? (
                 <ActivityIndicator color="#ffffff" />
@@ -242,6 +524,7 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
             </TouchableOpacity>
           </View>
         </View>
+        )}
         
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -291,6 +574,90 @@ const AssignTagScreen = ({ navigation }: AssignTagScreenProps) => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Oracle/SKU Search Modal */}
+      <Modal
+        visible={isSearchModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsSearchModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Search by Oracle ID or SKU</Text>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => setIsSearchModalVisible(false)}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchTypeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.searchTypeButton,
+                  searchType === 'oracle' && styles.searchTypeSelected
+                ]}
+                onPress={() => setSearchType('oracle')}
+              >
+                <Text
+                  style={[
+                    styles.searchTypeText,
+                    searchType === 'oracle' && styles.searchTypeTextSelected
+                  ]}
+                >
+                  Oracle ID
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.searchTypeButton,
+                  searchType === 'sku' && styles.searchTypeSelected
+                ]}
+                onPress={() => setSearchType('sku')}
+              >
+                <Text
+                  style={[
+                    styles.searchTypeText,
+                    searchType === 'sku' && styles.searchTypeTextSelected
+                  ]}
+                >
+                  SKU
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalSearchContainer}>
+              <TextInput
+                style={styles.modalSearchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder={`Enter ${searchType === 'oracle' ? 'Oracle ID' : 'SKU'}`}
+                placeholderTextColor="#9ca3af"
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={styles.modalScanButton}
+                onPress={handleBarcodeSimulation}
+              >
+                <Image 
+                  source={{ uri: 'https://img.icons8.com/ios-filled/100/ffffff/barcode-scanner.png' }}
+                  style={styles.modalScanIcon}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalSearchButton}
+              onPress={handleOracleSearch}
+            >
+              <Text style={styles.modalSearchButtonText}>Search</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -368,6 +735,10 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     fontSize: 16,
   },
+  inputError: {
+    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
   scanButton: {
     backgroundColor: '#10b981',
     width: 48,
@@ -384,6 +755,81 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     tintColor: 'white',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#ef4444',
+    marginTop: 4,
+  },
+  validatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  validatingText: {
+    fontSize: 12,
+    color: '#3b82f6',
+    marginLeft: 4,
+  },
+  validContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  validIcon: {
+    width: 14,
+    height: 14,
+    tintColor: '#10b981',
+  },
+  validText: {
+    fontSize: 12,
+    color: '#10b981',
+    marginLeft: 4,
+  },
+  itemSearchContainer: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  itemSearchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'white',
+    color: '#1f2937',
+    fontSize: 14,
+  },
+  searchOracleButton: {
+    backgroundColor: '#6366f1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  searchIcon: {
+    width: 14,
+    height: 14,
+    tintColor: 'white',
+    marginRight: 4,
+  },
+  searchOracleText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  selectedItemBanner: {
+    backgroundColor: '#e0f2fe',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0ea5e9',
+  },
+  selectedItemText: {
+    color: '#0e7490',
+    fontWeight: '500',
   },
   itemsContainer: {
     marginBottom: 16,
@@ -426,13 +872,24 @@ const styles = StyleSheet.create({
   itemNameSelected: {
     color: 'white',
   },
+  itemDetailsRow: {
+    flexDirection: 'row',
+    marginTop: 2,
+  },
   itemSku: {
     fontSize: 14,
     color: '#4b5563',
-    marginTop: 2,
+    marginRight: 8,
   },
   itemSkuSelected: {
     color: 'rgba(255, 255, 255, 0.8)',
+  },
+  itemOracleId: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  itemOracleIdSelected: {
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   itemDescription: {
     fontSize: 12,
@@ -452,6 +909,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  itemCheckboxSelected: {
+    borderColor: 'white',
+  },
   itemCheckboxInner: {
     width: 20,
     height: 20,
@@ -464,6 +924,32 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     tintColor: '#10b981',
+  },
+  zonesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  zoneButton: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  zoneButtonSelected: {
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
+  },
+  zoneButtonText: {
+    fontSize: 14,
+    color: '#4b5563',
+  },
+  zoneButtonTextSelected: {
+    color: 'white',
+    fontWeight: '500',
   },
   submitButton: {
     backgroundColor: '#10b981',
@@ -548,6 +1034,108 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 2,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    width: '100%',
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  closeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: '#4b5563',
+  },
+  searchTypeContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    padding: 4,
+  },
+  searchTypeButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  searchTypeSelected: {
+    backgroundColor: '#6366f1',
+  },
+  searchTypeText: {
+    fontWeight: '500',
+    color: '#4b5563',
+  },
+  searchTypeTextSelected: {
+    color: 'white',
+  },
+  modalSearchContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  modalSearchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'white',
+    color: '#1f2937',
+    fontSize: 16,
+  },
+  modalScanButton: {
+    backgroundColor: '#6366f1',
+    width: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  modalScanIcon: {
+    width: 24,
+    height: 24,
+    tintColor: 'white',
+  },
+  modalSearchButton: {
+    backgroundColor: '#6366f1',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalSearchButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  }
 });
 
 export default AssignTagScreen; 

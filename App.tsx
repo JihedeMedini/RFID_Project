@@ -9,15 +9,25 @@ import OfflineModeScreen from './screens/OfflineModeScreen';
 import HomeScreen from './screens/HomeScreen';
 import AIInsightsScreen from './screens/AIInsightsScreen';
 import AIChatScreen from './screens/AIChatScreen';
+import ItemLookupScreen from './screens/ItemLookupScreen';
+import PrintTagScreen from './screens/PrintTagScreen';
+import IssuanceVerificationScreen from './screens/IssuanceVerificationScreen';
+import AlertDetailScreen from './screens/AlertDetailScreen';
+import AlertsScreen from './screens/AlertsScreen';
 
 // Define the navigation stack types
 export type RootStackParamList = {
   Home: undefined;
   TagScanner: undefined;
-  AssignTag: undefined;
+  AssignTag: { itemId?: string } | undefined;
   OfflineMode: undefined;
   AIInsights: undefined;
   AIChat: undefined;
+  ItemLookup: undefined;
+  PrintTag: { tagId: string; itemId: string };
+  IssuanceVerification: undefined;
+  AlertDetail: { alertId: string };
+  Alerts: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -56,6 +66,31 @@ export default function App() {
           name="OfflineMode" 
           component={OfflineModeScreen} 
           options={{ title: 'Offline Mode' }} 
+        />
+        <Stack.Screen 
+          name="ItemLookup" 
+          component={ItemLookupScreen} 
+          options={{ title: 'Item Lookup' }} 
+        />
+        <Stack.Screen 
+          name="PrintTag" 
+          component={PrintTagScreen} 
+          options={{ title: 'Print Tag' }} 
+        />
+        <Stack.Screen 
+          name="IssuanceVerification" 
+          component={IssuanceVerificationScreen} 
+          options={{ title: 'Issuance Verification' }} 
+        />
+        <Stack.Screen 
+          name="Alerts" 
+          component={AlertsScreen} 
+          options={{ title: 'Alerts' }} 
+        />
+        <Stack.Screen 
+          name="AlertDetail" 
+          component={AlertDetailScreen} 
+          options={{ title: 'Alert Details' }} 
         />
         <Stack.Screen 
           name="AIInsights" 
