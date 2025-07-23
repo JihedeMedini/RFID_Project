@@ -1,4 +1,4 @@
-import { Item, Zone, MovementType, AlertType, AlertSeverity } from './types';
+import { Item, Zone } from './types';
 
 // Pre-defined items for the warehouse
 export const MOCK_ITEMS: Item[] = [
@@ -35,12 +35,13 @@ export const MOCK_ITEMS: Item[] = [
 ];
 
 // Generate a ZPL label for a tag and item
-export function generateZPLLabel(tagId: string, item: Item): string {
+export function generateZPLLabel(tagId: string, item: Item, homeZone: Zone): string {
   return `^XA
 ^FO50,50^FDItem: ${item.name}^FS
 ^FO50,100^FDTag ID: ${tagId}^FS
 ^FO50,150^FDSKU: ${item.sku}^FS
-^FO50,200^BC^FD${tagId}^FS
+^FO50,200^FDHome Zone: ${homeZone.replace('_', ' ')}^FS
+^FO50,250^BC^FD${tagId}^FS
 ^XZ`;
 }
 

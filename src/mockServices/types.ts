@@ -12,6 +12,7 @@ export interface TagAssignment {
   itemId: string;
   assignedAt: string;
   assignedBy?: string;
+  homeZone: Zone;
 }
 
 export interface MovementLog {
@@ -31,6 +32,8 @@ export interface Alert {
   timestamp: string;
   resolved: boolean;
   message?: string;
+  status: AlertStatus;
+  comment?: string;
 }
 
 export enum Zone {
@@ -49,15 +52,20 @@ export enum MovementType {
 }
 
 export enum AlertType {
-  UNAUTHORIZED_EXIT = 'UNAUTHORIZED_EXIT',
-  UNASSIGNED_TAG = 'UNASSIGNED_TAG',
-  UNAUTHORIZED_ZONE = 'UNAUTHORIZED_ZONE',
-  MISSING_SCAN = 'MISSING_SCAN'
+  UNAUTHORIZED_MOVEMENT = 'UNAUTHORIZED_MOVEMENT',
+  WRONG_ZONE = 'WRONG_ZONE',
+  QUANTITY_MISMATCH = 'QUANTITY_MISMATCH'
 }
-
+ 
 export enum AlertSeverity {
   LOW = 'LOW',
   MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  CRITICAL = 'CRITICAL'
-} 
+  HIGH = 'HIGH'
+}
+ 
+export enum AlertStatus {
+  NEW = 'NEW',
+  ACKNOWLEDGED = 'ACKNOWLEDGED',
+  RESOLVED = 'RESOLVED',
+  COMMENTED = "COMMENTED"
+}

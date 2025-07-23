@@ -1,6 +1,5 @@
 import { Alert, AlertType, AlertSeverity, AlertStatus } from './types';
 import { generateId } from './mockData';
-import TagService from './TagService';
 
 const LOCAL_STORAGE_KEY = 'rfid_alerts';
 
@@ -22,6 +21,7 @@ class AlertService {
       timestamp: new Date().toISOString(),
       resolved: false,
       message,
+      comment: '',
       status: AlertStatus.NEW
     };
     

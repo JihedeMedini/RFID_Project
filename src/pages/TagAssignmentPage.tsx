@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import type { Item, TagAssignment } from '../mockServices';
 import { TagService, MOCK_ITEMS, generateZPLLabel } from '../mockServices';
+import { Zone } from '../mockServices/types';
 import PrintingAnimation from '../components/PrintingAnimation';
 
 const TagAssignmentPage = () => {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [tagId, setTagId] = useState('');
+  const [homeZone, setHomeZone] = useState<Zone>(Zone.WAREHOUSE);
   const [assignments, setAssignments] = useState<TagAssignment[]>([]);
   const [zplPreview, setZplPreview] = useState<string | null>(null);
   const [showZplModal, setShowZplModal] = useState(false);
@@ -27,6 +29,10 @@ const TagAssignmentPage = () => {
     setTagId(e.target.value);
   };
 
+  const handleHomeZoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setHomeZone(e.target.value as Zone);
+  };
+
   const handleAssign = () => {
     if (!selectedItem || !tagId.trim()) {
       alert('Please select an item and enter a tag ID');
@@ -43,14 +49,14 @@ const TagAssignmentPage = () => {
     setIsAssignButtonAnimating(true);
     setTimeout(() => setIsAssignButtonAnimating(false), 500);
 
-    // Assign tag to item
-    const assignment = TagService.assignTag(tagId, selectedItem.id);
+    // Assign tag to item with home zone
+    const assignment = TagService.assignTag(tagId, selectedItem.id, homeZone);
     
     // Update local state
     setAssignments([assignment, ...assignments]);
     
     // Generate ZPL label
-    const zpl = generateZPLLabel(tagId, selectedItem);
+    const zpl = generateZPLLabel(tagId, selectedItem, homeZone);
     setZplPreview(zpl);
     setShowZplModal(true);
     
@@ -148,11 +154,32 @@ const TagAssignmentPage = () => {
                     className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2 rounded-md border border-gray-300 transition-all duration-300 flex items-center hover:shadow-md active:scale-95"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 animate-pulse" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 2V5h1v1H5zm-2 7a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm2 2v-1h1v1H5zm8-12a1 1 0 00-1 1v3a1 1 0 001 1h3a1 1 0 001-1V4a1 1 0 00-1-1h-3zm1 2V5h1v1h-1zm-2 7a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3zm2 2v-1h1v1h-1z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-14-14zM14 3.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-6 11a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" clipRule="evenodd" />
                     </svg>
                     Scan
                   </button>
                 </div>
+              </div>
+
+              <div className="transition-all duration-300 ease-in-out transform hover:scale-[1.01]">
+                <label htmlFor="homeZone" className="block text-sm font-medium text-gray-700 mb-1">
+                  Home Zone
+                </label>
+                <select
+                  id="homeZone"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  value={homeZone}
+                  onChange={handleHomeZoneChange}
+                >
+                  {Object.values(Zone).map(zone => (
+                    <option key={zone} value={zone}>
+                      {zone.replace('_', ' ')}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  The home zone is the initial location where this item belongs.
+                </p>
               </div>
               
               <button
@@ -178,10 +205,13 @@ const TagAssignmentPage = () => {
                 <span className="font-medium text-gray-700">2.</span> Enter a tag ID or click "Scan" to simulate scanning
               </p>
               <p className="transition-all duration-300 hover:text-blue-600 hover:translate-x-1">
-                <span className="font-medium text-gray-700">3.</span> Click "Assign Tag" to create the assignment
+                <span className="font-medium text-gray-700">3.</span> Select a home zone for the item
               </p>
               <p className="transition-all duration-300 hover:text-blue-600 hover:translate-x-1">
-                <span className="font-medium text-gray-700">4.</span> A ZPL label will be generated for printing
+                <span className="font-medium text-gray-700">4.</span> Click "Assign Tag" to create the assignment
+              </p>
+              <p className="transition-all duration-300 hover:text-blue-600 hover:translate-x-1">
+                <span className="font-medium text-gray-700">5.</span> A ZPL label will be generated for printing
               </p>
             </div>
           </div>
@@ -213,6 +243,7 @@ const TagAssignmentPage = () => {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag ID</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Home Zone</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                     </tr>
                   </thead>
@@ -242,6 +273,26 @@ const TagAssignmentPage = () => {
                             ) : (
                               <span className="text-gray-500">Unknown Item</span>
                             )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="px-2 py-1 text-xs font-medium rounded-full" 
+                              style={{
+                                backgroundColor: assignment.homeZone === Zone.WAREHOUSE ? '#e3f2fd' :
+                                  assignment.homeZone === Zone.SHIPPING ? '#e8f5e9' :
+                                  assignment.homeZone === Zone.RECEIVING ? '#fff3e0' :
+                                  assignment.homeZone === Zone.QUALITY_CHECK ? '#f3e5f5' :
+                                  assignment.homeZone === Zone.ENTRY ? '#e0f7fa' :
+                                  assignment.homeZone === Zone.EXIT ? '#ffebee' : '#f5f5f5',
+                                color: assignment.homeZone === Zone.WAREHOUSE ? '#1565c0' :
+                                  assignment.homeZone === Zone.SHIPPING ? '#2e7d32' :
+                                  assignment.homeZone === Zone.RECEIVING ? '#e65100' :
+                                  assignment.homeZone === Zone.QUALITY_CHECK ? '#6a1b9a' :
+                                  assignment.homeZone === Zone.ENTRY ? '#00838f' :
+                                  assignment.homeZone === Zone.EXIT ? '#c62828' : '#616161'
+                              }}
+                            >
+                              {assignment.homeZone?.replace('_', ' ')}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {new Date(assignment.assignedAt).toLocaleString()}

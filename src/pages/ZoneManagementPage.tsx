@@ -16,9 +16,9 @@ import ZoneCreationForm, { ZoneType, RuleType } from '../components/ZoneCreation
 const mockZones: ZoneType[] = [
   {
     id: 1,
-    name: 'Warehouse Zone A',
+    name: 'EXIT ZONE',
     description: 'Main storage area for finished products',
-    type: 'warehouse',
+    type: 'EXIT',
     color: '#3B82F6', // Blue
     readers: [1, 4],
     rules: [
@@ -69,9 +69,9 @@ const mockZones: ZoneType[] = [
   },
   {
     id: 4,
-    name: 'Restricted Zone',
+    name: 'Warehouse Zone',
     description: 'High-security area with limited access',
-    type: 'restricted',
+    type: 'warehouse',
     color: '#EF4444', // Red
     readers: [5],
     rules: [

@@ -12,7 +12,7 @@ export type ZoneType = {
   id: number;
   name: string;
   description: string;
-  type: 'warehouse' | 'shipping' | 'receiving' | 'restricted' | 'custom';
+  type: 'warehouse' | 'shipping' | 'receiving' | 'EXIT' | 'Entry' | 'Quality check';
   color: string;
   readers: number[];
   rules: RuleType[];

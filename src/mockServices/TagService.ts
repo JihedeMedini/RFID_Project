@@ -1,5 +1,6 @@
-import { Item, TagAssignment } from './types';
-import { generateId } from './mockData';
+import { Item, TagAssignment, Zone } from './types';
+import MovementService from './MovementService';
+import { MovementType } from './types';
 
 const LOCAL_STORAGE_KEY = 'rfid_tag_assignments';
 
@@ -7,10 +8,11 @@ class TagService {
   /**
    * Assign an RFID tag to an item
    */
-  assignTag(tagId: string, itemId: string): TagAssignment {
+  assignTag(tagId: string, itemId: string, homeZone: Zone): TagAssignment {
     const assignment: TagAssignment = {
       tagId,
       itemId,
+      homeZone,
       assignedAt: new Date().toISOString()
     };
     
@@ -18,6 +20,10 @@ class TagService {
     assignments.push(assignment);
     
     this.saveAssignments(assignments);
+    
+    // Log initial movement to the home zone
+    MovementService.logMovement(tagId, homeZone, MovementType.IN);
+    
     return assignment;
   }
   
