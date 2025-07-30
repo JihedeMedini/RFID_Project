@@ -14,17 +14,17 @@ const Layout = ({ children }: LayoutProps) => {
   };
   
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 app-container">
       <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
       <Header toggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
       
       <main className={`pt-16 ${sidebarCollapsed ? 'ml-16' : 'ml-64'} transition-all duration-300`}>
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-3 py-5"> {/* Reduced padding from px-4 py-6 to px-3 py-5 */}
           {children}
         </div>
       </main>
       
-      <footer className={`bg-white border-t border-gray-200 py-4 px-6 text-sm text-gray-600 ${sidebarCollapsed ? 'ml-16' : 'ml-64'} transition-all duration-300`}>
+      <footer className={`bg-white border-t border-gray-200 py-3 px-5 text-sm text-gray-600 ${sidebarCollapsed ? 'ml-16' : 'ml-64'} transition-all duration-300`}>
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="mb-2 md:mb-0">
             <p>&copy; 2025 RFID Warehouse Management System</p>

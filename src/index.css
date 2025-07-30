@@ -1,3 +1,30 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Global scaling adjustments for better default sizing */
+html {
+  font-size: 14px; /* Reduced from default 16px to scale everything down */
+}
+
+body {
+  font-size: 0.875rem; /* 14px equivalent */
+}
+
+/* Scale down the main application container slightly */
+#root {
+  font-size: 0.9rem;
+}
+
+/* Ensure better responsive behavior */
+@media (max-width: 1024px) {
+  html {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 12px;
+  }
+}

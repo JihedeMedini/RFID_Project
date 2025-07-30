@@ -245,7 +245,7 @@ const LogsViewer = ({ initialLogs = [], onRefresh }: LogsViewerProps) => {
                 onChange={(e) => handleFilterChange('zone', e.target.value)}
               >
                 <option value="">All Zones</option>
-                {zones.map((zone, index) => (
+                {zones.filter(zone => zone != null).map((zone, index) => (
                   <option key={index} value={zone}>
                     {zone}
                   </option>

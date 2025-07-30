@@ -160,8 +160,9 @@ const ZoneManagementPage = () => {
       case 'warehouse': return 'Warehouse';
       case 'shipping': return 'Shipping';
       case 'receiving': return 'Receiving';
-      case 'restricted': return 'Restricted';
-      case 'custom': return 'Custom';
+      case 'EXIT': return 'Exit';
+      case 'Entry': return 'Entry';
+      case 'Quality check': return 'Quality Check';
       default: return type;
     }
   };

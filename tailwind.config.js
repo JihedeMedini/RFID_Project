@@ -6,9 +6,27 @@ export default {
   ],
   theme: {
     extend: {
+      fontSize: {
+        'xs': '0.7rem',    // Even smaller for compact mode
+        'sm': '0.8rem',    // Smaller small text
+        'base': '0.875rem', // Reduced base font size
+        'lg': '1rem',      // What used to be base
+        'xl': '1.125rem',  // Slightly smaller xl
+      },
       container: {
         center: true,
-        padding: '1rem',
+        padding: '0.75rem', // Reduced from 1rem
+        screens: {
+          sm: '640px',
+          md: '768px',
+          lg: '1024px',
+          xl: '1280px',
+          '2xl': '1400px', // Reduced from default 1536px
+        },
+      },
+      spacing: {
+        '1.5': '0.325rem', // Smaller spacing option
+        '2.5': '0.575rem', // Smaller spacing option
       },
       animation: {
         'slide-up': 'slideUp 0.6s ease-in-out',
