@@ -11,6 +11,8 @@ import {
 import ApiIntegrationSettings from '../components/ApiIntegrationSettings';
 import PrinterConfiguration from '../components/PrinterConfiguration';
 import NotificationSettings from '../components/NotificationSettings';
+import UserPreferences from '../components/UserPreferences';
+import SecuritySettings from '../components/SecuritySettings';
 
 type SettingsTab = 'api' | 'printer' | 'notifications' | 'user' | 'security';
 
@@ -123,29 +125,11 @@ const SettingsPage = () => {
           )}
           
           {activeTab === 'user' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center mb-4">
-                <UserIcon className="h-5 w-5 text-blue-500 mr-2" />
-                <h2 className="text-lg font-medium text-gray-900">User Preferences</h2>
-              </div>
-              
-              <div className="text-center py-8 text-gray-500">
-                <p>User preferences settings will be implemented in a future update.</p>
-              </div>
-            </div>
+            <UserPreferences />
           )}
           
           {activeTab === 'security' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center mb-4">
-                <ShieldCheckIcon className="h-5 w-5 text-blue-500 mr-2" />
-                <h2 className="text-lg font-medium text-gray-900">Security Settings</h2>
-              </div>
-              
-              <div className="text-center py-8 text-gray-500">
-                <p>Security settings will be implemented in a future update.</p>
-              </div>
-            </div>
+            <SecuritySettings />
           )}
         </div>
         
